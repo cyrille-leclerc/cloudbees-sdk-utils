@@ -3,16 +3,14 @@ package com.cloudbees.mail;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Resources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.mail.BodyPart;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Transport;
+import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
@@ -29,6 +27,8 @@ public class MailTool {
     protected Session mailSession;
     protected Transport mailTransport;
     protected InternetAddress mailFrom;
+    protected InternetAddress mailBcc;
+    boolean test = false;
 
     public MailTool() throws Exception {
         InputStream smtpPropertiesAsStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("smtp.properties");
@@ -48,6 +48,15 @@ public class MailTool {
             mailFrom = new InternetAddress(smtpProperties.getProperty("mail.from"));
         } catch (Exception e) {
             throw new MessagingException("Exception parsing 'mail.from' from 'smtp.properties'", e);
+        }
+
+        String bcc = smtpProperties.getProperty("mail.bcc");
+        if (!Strings.isNullOrEmpty(bcc)) {
+            try {
+                mailBcc = new InternetAddress(bcc);
+            } catch (Exception e) {
+                logger.warn("invalid 'mail.bcc=" + bcc + "'", e);
+            }
         }
 
     }
@@ -71,21 +80,25 @@ public class MailTool {
 
         Set<String> lines = Sets.newTreeSet(Resources.readLines(databasesUrl, Charsets.ISO_8859_1));
         for (String line : lines) {
-            line = line.trim();
-            if (line.startsWith("#")) {
-                // skip
-            } else {
+            try {
+                line = line.trim();
+                if (line.startsWith("#")) {
+                    // skip
+                } else {
 
-                Iterator<String> split = splitter.split(line).iterator();
-                String email = split.next();
-                String account = split.next();
-                String databases = split.next();
-                Map<String, String> templatesParams = Maps.newHashMap();
-                templatesParams.put("email", email);
-                templatesParams.put("accounts", account);
-                templatesParams.put("databases", databases);
+                    Iterator<String> split = splitter.split(line).iterator();
+                    String email = split.next();
+                    String account = split.next();
+                    String databases = split.next();
+                    Map<String, String> templatesParams = Maps.newHashMap();
+                    templatesParams.put("email", email);
+                    templatesParams.put("accounts", account);
+                    templatesParams.put("databases", databases);
 
-                sendEmail(templatesParams, email);
+                    sendEmail(templatesParams, email);
+                }
+            } catch (Exception e) {
+                logger.warn("Exception processing line '{}'", line, e);
             }
         }
     }
@@ -95,6 +108,11 @@ public class MailTool {
     }
 
     public void sendEmail(Map<String, String> templatesParams, List<BodyPart> attachments, String toAddress) throws MessagingException {
+
+        if (test) {
+            logger.info("TEST Send email to {}", toAddress);
+            return;
+        }
         logger.info("Send email to {}", toAddress);
 
         MimeBodyPart htmlAndPlainTextAlternativeBody = new MimeBodyPart();
@@ -124,8 +142,11 @@ public class MailTool {
         MimeMessage msg = new MimeMessage(mailSession);
 
         msg.setFrom(mailFrom);
-        msg.addRecipient(javax.mail.Message.RecipientType.TO, new InternetAddress(toAddress));
-        msg.addRecipient(javax.mail.Message.RecipientType.CC, mailFrom);
+        msg.addRecipient(Message.RecipientType.TO, new InternetAddress(toAddress));
+        // msg.addRecipient(Message.RecipientType.CC, mailFrom);
+        if (mailBcc != null) {
+            msg.addRecipient(Message.RecipientType.BCC, mailBcc);
+        }
 
         String subject = FreemarkerUtils.generate(templatesParams, "/com/cloudbees/mail/email.subject.ftl");
         msg.setSubject(subject);

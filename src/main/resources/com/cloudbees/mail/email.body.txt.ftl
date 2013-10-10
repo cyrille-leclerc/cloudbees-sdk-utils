@@ -1,4 +1,4 @@
-Dear Customer,
+Dear CloudBees Customer,
 
 We noticed that you may have experienced a problem yesterday in creating new databases on your CloudBees account, as identified below. We have looked into the issue and corrected it. Any databases you created yesterday should now be operational and able to be used with applications or a desktop client.
 

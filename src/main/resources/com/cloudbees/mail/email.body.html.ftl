@@ -1,7 +1,7 @@
 <html>
 <body>
 <p>
-    Dear Customer,
+    Dear CloudBees Customer,
 </p>
 
 <p>
