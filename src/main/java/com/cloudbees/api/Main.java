@@ -13,11 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.cloudbees.sdk;
+package com.cloudbees.api;
 
-import com.cloudbees.api.BeesClient;
-import com.cloudbees.api.CBAccount;
-import com.cloudbees.api.DatabaseInfo;
 import com.google.common.base.*;
 import com.google.common.collect.*;
 import com.google.common.io.Resources;
@@ -28,9 +25,9 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URL;
-import java.util.Collection;
-import java.util.Properties;
-import java.util.Set;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.*;
 
 /**
  * @author <a href="mailto:cleclerc@cloudbees.com">Cyrille Le Clerc</a>
@@ -96,16 +93,50 @@ public class Main {
             }
         });
 
-        Multimap<String,String> databasesByAccount = ArrayListMultimap.create();
+        Multimap<String, String> databasesByAccount = ArrayListMultimap.create();
 
-
+        Class.forName("com.mysql.jdbc.Driver");
 
         for (String databaseName : databaseNames) {
             try {
-                DatabaseInfo databaseInfo = client.databaseInfo(databaseName, false);
+                DatabaseInfo databaseInfo = client.databaseInfo(databaseName, true);
                 databasesByAccount.put(databaseInfo.getOwner(), databaseInfo.getName());
+                logger.debug("Evaluate " + databaseInfo.getName());
+
+
+                if (true == false) {
+                    // Hibernate
+                    logger.info("Hibernate {}", databaseName);
+                    Map<String, String> params = new HashMap<String, String>();
+                    params.put("database_id", databaseName);
+                    String url = client.getRequestURL("database.hibernate", params);
+                    String response = client.executeRequest(url);
+                    DatabaseInfoResponse apiResponse = (DatabaseInfoResponse) client.readResponse(response);
+                    logger.info("DB {} status: {}", apiResponse.getDatabaseInfo().getName(), apiResponse.getDatabaseInfo().getStatus());
+
+                }
+                if (true == false) {
+                    // Hibernate
+                    logger.info("Activate {}", databaseName);
+                    Map<String, String> params = new HashMap<String, String>();
+                    params.put("database_id", databaseName);
+                    String url = client.getRequestURL("database.activate", params);
+                    String response = client.executeRequest(url);
+                    DatabaseInfoResponse apiResponse = (DatabaseInfoResponse) client.readResponse(response);
+                    logger.info("DB {} status: {}", apiResponse.getDatabaseInfo().getName(), apiResponse.getDatabaseInfo().getStatus());
+                }
+
+
+                String dbUrl = "jdbc:mysql://" + databaseInfo.getMaster() + "/" + databaseInfo.getName();
+                logger.info("Connect to {} user={}", dbUrl, databaseInfo.getUsername());
+                Connection cnn = DriverManager.getConnection(
+                        dbUrl,
+                        databaseInfo.getUsername(), databaseInfo.getPassword());
+                cnn.setAutoCommit(false);
+                cnn.close();
+
             } catch (Exception e) {
-                logger.warn("Exception getting db info for {}", databaseName, e);
+                logger.warn("Exception for {}", databaseName, e);
             }
         }
 

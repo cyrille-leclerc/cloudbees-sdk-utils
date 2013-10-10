@@ -1,2 +1,5 @@
 account-emails.txt
 account-databases.txt
+email-data.txt
+databases.txt
+smtp.properties
